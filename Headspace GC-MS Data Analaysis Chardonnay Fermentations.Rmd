@@ -1,0 +1,473 @@
+---
+title: "Headspace GC-MS Data Analaysis Chardonnay Fermentations"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This analysis is for the GCMS headspace data collected at Supra. The peak areas are from confirmed compounds with standards ran as well as some putitativly identified peaks. 
+
+The peak areas were normalized to the TIC for each sample, therefore the values being analyzed in this dataset are RELATIVE ABUNDANCES and NOT absolute quantitative values. 
+
+
+```{r message=FALSE}
+library(readxl)
+library(tigerstats)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(visreg)
+library(car)
+library(agricolae)
+library(devtools)
+library(xlsx)
+library(corrplot)
+library(Hmisc)
+library(cowplot)
+library(ggcorrplot)
+library(RColorBrewer)
+library(gplots)
+library(ggfortify)
+library(ggthemes)
+```
+
+
+```{r}
+df<-read_xlsx("revised peak areas 20200314.xlsx", sheet= "TIC_Norm_areas") %>% data.frame()
+df <- filter(df, strain != "curve")
+df <- filter(df, strain != "Model_Wine")
+df <- filter(df, strain != "Blank")
+df <- filter(df, strain != "QC")
+
+full <- df
+hot <- filter(df, temperature == "25")
+cold <- filter(df, temperature =="15")
+```
+
+
+
+
+______________________________________________________________________________________________________________________________
+
+Create PCA plots for the full data set colored by strain and temperature. Blanks, QCs were removed. the plots are saved as JPEGS, and loading plots are omitted.  
+```{r}
+# PCA
+full_pcaformat <- full[6:ncol(full)] %>% data.frame()
+row.names(full_pcaformat) <- full$sample_ID
+full_pca <- prcomp(full_pcaformat, center = TRUE, scale. = TRUE)
+
+
+#Colored by strain
+strain <- full$strain
+all_species_pca <- autoplot(full_pca, data = full, colour = 'species', scale = T, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm"))+
+  scale_color_colorblind(labels = c(expression(italic("S. cerevisiae")), expression(italic("S. uvarum")))) 
+ 
+#ggsave("output/pca_plots/pca_full_Strainv2.jpeg")
+
+#Colored by Temperature
+#temperature <- full$temperature
+all_temp_pca <- autoplot(full_pca, data = full, colour = 'temperature', scale = T, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm")) +
+  scale_color_colorblind(labels = c(expression("15C"), expression("25C"))) 
+#ggsave("pca_full_temp.jpeg")
+```
+
+
+
+______________________________________
+
+PCA plots of 15C (cold) dataset:
+```{r}
+
+cold_pcaformat <- cold[6:ncol(cold)] %>% data.frame()
+row.names(cold_pcaformat) <- cold$sample_ID
+cold_pca <- prcomp(cold_pcaformat, center = TRUE, scale. = TRUE)
+#summary(cold_pca)
+cold$strain
+#PCA plot of cold temp fermentations colored by strain:
+strain <- cold$strain
+cold_strain_pca <- autoplot(cold_pca, data = cold, colour = 'strain', scale = TRUE, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm"),
+        legend.text=element_text(size=6.5))+ scale_color_calc()
+ 
+
+
+#ggsave("output/pca_plots/pca_15C_strain.jpeg")
+ 
+#make a PCA plot of the cold dataset colored by cerevisiae or uvarum:
+species <- cold$species
+cold_species_pca <- autoplot(cold_pca, data = cold, colour = 'species', scale = TRUE, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm")) +
+  scale_color_colorblind(labels = c(expression(italic("S. cerevisiae")), expression(italic("S. uvarum")))) 
+
+#ggsave("output/pca_plots/pca_15C_species.jpeg")
+```
+labels = c(expression(italic("S. cerevisiae")), expression(italic("S. uvarum")))
+
+___________________________________
+
+PCA plots of 25C (hot) dataset:
+```{r}
+hot_pcaformat <- hot[6:ncol(hot)] %>% data.frame()
+row.names(hot_pcaformat) <- hot$sample_ID
+
+hot_pca <- prcomp(hot_pcaformat, center = TRUE, scale. = TRUE)
+#summary(hot_pca)
+
+#Hot df colored by strain
+strain <- hot$strain
+hot_strain_pca <- autoplot(hot_pca, data = hot, colour = 'strain', scale = TRUE, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm"),
+        legend.text=element_text(size=6.5)) + scale_color_calc()
+#ggsave("output/pca_plots/pca_25C_strain.jpeg")
+
+#make PCA plot of hot fermentations colored by strain type
+species <- hot$type
+hot_species_pca <-autoplot(hot_pca, data = hot, colour = 'species', scale = TRUE, size = 1.25,
+         loadings = FALSE, loadings.label = FALSE,loadings.label.repel=T,
+         loadings.label.size = 3,loadings.colour = 'black', 
+         loadings.label.colour = 'black') +
+  theme(panel.background = element_blank(),
+        panel.border=element_rect(fill=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background=element_blank(),
+        axis.text.x=element_text(colour="black"),
+        axis.text.y=element_text(colour="black"),
+        axis.ticks=element_line(colour="black"),
+        plot.margin=unit(c(1,1,1,1),"line"),
+        legend.key.size = unit(.025, "cm"),
+        legend.key.width = unit(.25,"cm")) +
+  scale_color_colorblind(labels = c(expression(italic("S. cerevisiae")), expression(italic("S. uvarum")))) 
+#ggsave("output/pca_plots/pca_25C_plot_species.jpeg")
+```
+
+Arrange figures into a grid and made into a single figure.
+```{r}
+pca_grid<-plot_grid(all_temp_pca, all_species_pca,
+                    cold_strain_pca, cold_species_pca, 
+                    hot_strain_pca, hot_species_pca,
+                    ncol = 2, 
+                    labels =c('A', 'B', 'C', 'D', 'E', 'F'),
+                    label_size = 10,
+                    align = "hv"
+                    )
+pca_grid
+
+#ggsave("output/pca_plots/pca_gridV4.jpeg")
+```
+
+
+
+Analyze the differences between each strain WITHIN a temperature using an ANOVA. 
+
+- Test for homogeneity of variance - levene's test
+- ANOVA
+- Post Hoc analysis - Tukey's HSD
+_____________________________________________________
+25C fermentations ANOVA and Post Hoc analysis:
+
+Levene's test
+```{r message=FALSE, warning=FALSE}
+filtered_df <- hot
+
+#this does the test on each column of filtered_df starting at column 4
+levene.results <- apply(filtered_df[,6:ncol(filtered_df)],2,function(x) {leveneTest(x~filtered_df$strain)})
+
+#this makes a table of pvalues
+levene.plvals<-lapply(levene.results,function(x) {c(x$`Pr(>F)`)}) %>% as.data.frame()
+head(levene.plvals)
+#Make an excel file for all the hot temp anova related results. 
+#write.xlsx(levene.plvals, file="output/Spreadsheets/25C_output_res.xlsx", sheetName="LevenesTest", row.names=TRUE)
+```
+
+ANOVA
+```{r}
+#define df I am analyzing 
+x<-hot
+
+#now create an empty df
+anova.out <- data.frame(ss_trt = rep(NA, 33), ss_error = rep(NA, 33), f_val = rep(NA, 33), p_val = rep(NA, 33), stringsAsFactors = FALSE)
+
+row.names(anova.out) <- colnames(x[,5:ncol(x)])
+
+#Create the for loop (compound ~ yeast strain) within in a single trt
+for (i in 6:ncol(x)) {
+lm.res<-lm(x[[i]]~ x$strain)
+anova.res<-anova(lm.res)
+anova.out$ss_trt[i-5] <- anova.res$`Sum Sq`[2]
+anova.out$ss_error[i-5] <- anova.res$`Sum Sq`[1]
+anova.out$f_val[i-5] <- anova.res$`F value`[1]
+anova.out$p_val[i-5] <- anova.res$`Pr(>F)`[1]
+}
+anova.out  
+
+#Write the results to an excel file inside a folder for this analysis. 
+#write.xlsx(anova.out, file="output/Spreadsheets/25C_output_res.xlsx", sheetName="ANOVA_results", append = TRUE, row.names=TRUE)
+```
+
+For the post hoc analysis I will use a Tukey's HSD test and generate letter codes to indicate significance. 
+Strains that share the same letter are not significantly different. 
+```{r}
+#Making a loop that will output the results into a df. 
+x <- hot
+#Make and empty df to fill
+hsd_df.out <-data.frame(X2_phenylethanol = rep(NA, 11),
+                        benzalcohol = rep(NA, 11), 
+                        dihydroxy_hexamethoxyflavone_putative = rep(NA, 11), 
+                        hexanoic_acid = rep(NA, 11),
+                        octanoic_acid = rep(NA, 11),
+                        X2_phenylethyl_acetate = rep(NA, 11),
+                        methionol = rep(NA, 11),
+                        X3_methylbutanoic_acid = rep(NA, 11),
+                        X2.methylbutanoic_acid = rep(NA, 11),
+                        ethyl_decanoate = rep(NA, 11),
+                        acetic_acid_putative = rep(NA, 11),
+                        ethyl_octanoate = rep(NA, 11),
+                        hexanol = rep(NA, 11), 
+                        hexyl_acetate = rep(NA, 11),
+                        ethyl_hexanoate = rep(NA, 11),
+                        X3methyl_butanol = rep(NA, 11),
+                        X2methyl_butanol = rep(NA, 11),
+                        X2methylbutyl_acetate = rep(NA, 11),
+                        X2methylpropanol = rep(NA, 11),
+                        ethyl_3_methyl_butanoate = rep(NA, 11),
+                        ethyl_2_methyl_butanoate = rep(NA, 11),
+                        ethyl_butanoate = rep(NA, 11),
+                        ethyl_2_methyl_propanoate = rep(NA, 11),
+                        ethyl_propanoate = rep(NA, 11),
+                        ethyl_acetate = rep(NA, 11),
+                        ethyl_formate_putative = rep(NA, 11),
+                        acetaldehyde_putative = rep(NA, 11),
+                        ethananolamine_putative = rep(NA, 11),
+                        ethanol= rep(NA, 11),
+                        glycerol= rep(NA, 11),
+                        glucose= rep(NA, 11),
+                        fructose= rep(NA, 11),
+                        aucl = rep(NA, 11),
+                        stringsAsFactors = FALSE) 
+row.names(hsd_df.out) <- sort(unique(x$strain))
+
+for (i in 6:ncol(x)) {
+model <- aov(x[[i]]~strain, data = x)  
+hsd_res <- HSD.test(model, "strain", group = TRUE)
+groups <- data.frame(hsd_res$groups)
+groups <- groups[order(row.names(groups)),]
+hsd_df.out[,i-5] <- groups$groups
+}
+hsd_df.out
+#Save the output into the anova results file:
+#write.xlsx(hsd_df.out, file="output/Spreadsheets/25C_output_res.xlsx", sheetName="HSD_PostHoc_results", append = TRUE, row.names=TRUE)
+```
+
+_____________________________________________________
+15C fermentation ANOVA and post hoc analysis:
+
+Levene's test
+```{r message=FALSE, warning=FALSE}
+filtered_df <- cold
+
+#this does the test on each column of filtered_df starting at column 4
+levene.results <- apply(filtered_df[,6:ncol(filtered_df)],2,function(x) {leveneTest(x~filtered_df$strain)})
+
+#this makes a table of pvalues
+levene.plvals<-lapply(levene.results,function(x) {c(x$`Pr(>F)`)}) %>% as.data.frame()
+levene.plvals
+ 
+#Write an excel file that will keep all of our anova results from cold fermentation analysis:
+#write.xlsx(levene.plvals, file="output/Spreadsheets/15C_output_res.xlsx", sheetName="LevenesTest", row.names=TRUE)
+```
+
+
+ANOVA for 15C (cold) fermentations
+```{r}
+#define df I am analyzing as x so that I dont have to change all the code for cold fermentaitons
+x<-cold
+#now create an empty df
+anova.out <- data.frame(ss_trt = rep(NA, 33), ss_error = rep(NA, 33), f_val = rep(NA, 33), p_val = rep(NA, 33), stringsAsFactors = FALSE)
+row.names(anova.out) <- colnames(x[,5:ncol(x)])
+#Create the for loop (compound ~ yeast strain) within in a single trt
+for (i in 6:ncol(x)) {
+lm.res<-lm(x[[i]]~ x$strain)
+anova.res<-anova(lm.res)
+anova.out$ss_trt[i-5] <- anova.res$`Sum Sq`[2]
+anova.out$ss_error[i-5] <- anova.res$`Sum Sq`[1]
+anova.out$f_val[i-5] <- anova.res$`F value`[1]
+anova.out$p_val[i-5] <- anova.res$`Pr(>F)`[1]
+}
+anova.out  
+#Write the results to an excel file inside a folder for this analysis. 
+#write.xlsx(anova.out, file="output/Spreadsheets/15C_output_res.xlsx", sheetName="ANOVA_results", append = TRUE, row.names=TRUE)
+```
+
+For the post hoc analysis I will use a Tukey's HSD test and generate letter codes to indicate significance. 
+Strains that share the same letter are not significantly different. 
+```{r}
+#Making a loop that will output the results into a df. 
+x <- cold
+#Make and empty df to fill
+hsd_df.out <-data.frame(X2_phenylethanol = rep(NA, 11),
+                        benzalcohol = rep(NA, 11), 
+                        dihydroxy_hexamethoxyflavone_putative = rep(NA, 11), 
+                        hexanoic_acid = rep(NA, 11),
+                        octanoic_acid = rep(NA, 11),
+                        X2_phenylethyl_acetate = rep(NA, 11),
+                        methionol = rep(NA, 11),
+                        X3_methylbutanoic_acid = rep(NA, 11),
+                        X2.methylbutanoic_acid = rep(NA, 11),
+                        ethyl_decanoate = rep(NA, 11),
+                        acetic_acid_putative = rep(NA, 11),
+                        ethyl_octanoate = rep(NA, 11),
+                        hexanol = rep(NA, 11), 
+                        hexyl_acetate = rep(NA, 11),
+                        ethyl_hexanoate = rep(NA, 11),
+                        X3methyl_butanol = rep(NA, 11),
+                        X2methyl_butanol = rep(NA, 11),
+                        X2methylbutyl_acetate = rep(NA, 11),
+                        X2methylpropanol = rep(NA, 11),
+                        ethyl_3_methyl_butanoate = rep(NA, 11),
+                        ethyl_2_methyl_butanoate = rep(NA, 11),
+                        ethyl_butanoate = rep(NA, 11),
+                        ethyl_2_methyl_propanoate = rep(NA, 11),
+                        ethyl_propanoate = rep(NA, 11),
+                        ethyl_acetate = rep(NA, 11),
+                        ethyl_formate_putative = rep(NA, 11),
+                        acetaldehyde_putative = rep(NA, 11),
+                        ethananolamine_putative = rep(NA, 11),
+                        ethanol= rep(NA, 11),
+                        glycerol= rep(NA, 11),
+                        glucose= rep(NA, 11),
+                        fructose= rep(NA, 11),
+                        aucl = rep(NA, 11),
+                        stringsAsFactors = FALSE) 
+row.names(hsd_df.out) <- sort(unique(x$strain))
+
+for (i in 6:ncol(x)) {
+model <- aov(x[[i]]~strain, data = x)  
+hsd_res <- HSD.test(model, "strain", group = TRUE)
+groups <- data.frame(hsd_res$groups)
+groups <- groups[order(row.names(groups)),]
+hsd_df.out[,i-5] <- groups$groups
+}
+hsd_df.out
+#write output to the excel file
+#write.xlsx(hsd_df.out, file="output/Spreadsheets/15C_output_res.xlsx", sheetName="HSD_PostHoc_results", append = TRUE, row.names=TRUE)
+```
+___________________________________________________________________________________________
+___________________________________________________________________________________________
+Heatmaps
+
+```{r}
+library(RColorBrewer)
+#library(ComplexHeatmap)
+```
+
+```{r}
+suppressWarnings({
+#15C all compounds averaged 
+cold_averages<-read_xlsx("15C.xlsx", sheet= "averages_for_correlation") %>% data.frame()
+rnames<- cold_averages$strain
+cold_averages <- cold_averages[2:ncol(cold_averages)]
+row.names(cold_averages) <- rnames
+cold_averages <- as.matrix(cold_averages)
+
+#25C all compounds averaged
+hot_averages<-read_xlsx("25C.xlsx", sheet= "averages_for_correlation") %>% data.frame()
+rnames<- hot_averages$strain
+hot_averages <- hot_averages[2:ncol(hot_averages)]
+row.names(hot_averages) <- rnames
+hot_averages <- as.matrix(hot_averages)
+
+#Sclaed by column,since we need to absorb the variation between column.
+trans<- t(as.matrix(hot_averages))
+
+trans<- t(as.matrix(cold_averages))
+
+x <- trans
+rm <- rowMeans(x)
+x             <- sweep(x, 1, rm)
+sx            <- apply(x, 1, sd)
+x             <- sweep(x, 1, sx, "/")
+
+
+heatmap(x, name = "x", 
+        col = brewer.pal(11,"RdYlBu"),
+        cluster_rows = FALSE, cluster_columns = FALSE,
+        row_split = rep(c("A", "B", "C", 
+                          "D", "E" ), 
+                        c(4,5,7,8,4)),
+        cluster_row_slices = FALSE, cluster_column_slices = FALSE)
+})
+
+```
+
+
+
